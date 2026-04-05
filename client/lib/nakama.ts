@@ -15,7 +15,7 @@ class Nakama {
 
     constructor() {
         this.client = new Client(
-            "xvo-nakama-prod-2026",
+            "defaultkey",
             process.env.NEXT_PUBLIC_SERVER_API,
             process.env.NEXT_PUBLIC_SERVER_PORT,
             process.env.NEXT_PUBLIC_USE_SSL === "true"
