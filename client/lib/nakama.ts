@@ -31,19 +31,27 @@ class Nakama {
         try {
             this.session = await this.client.authenticateDevice(deviceId, true);
         } catch (err: any) {
-            console.log("Error authenticating device: %o:%o", err.statusCode, err.message);
+            console.error("Auth error:", err.statusCode, err.message);
+            return;
         }
         if (!this.session?.user_id) return;
         localStorage.setItem("user_id", this.session.user_id);
-        const trace = false;
-        this.socket = this.client.createSocket(process.env.NEXT_PUBLIC_USE_SSL === "true", trace);
-        await this.socket.connect(this.session, true);
-    }
 
-    async createMatch(): Promise<void> {
-        if (!this.socket || !this.session) return;
-        const match = await this.socket.createMatch();
-        console.log("Match created:", match.match_id);
+        const useSSL = process.env.NEXT_PUBLIC_USE_SSL === "true";
+        this.socket = this.client.createSocket(useSSL, false);
+
+        // Handle socket errors gracefully
+        this.socket.ondisconnect = (event) => {
+            console.log("Socket disconnected:", event);
+        };
+
+        try {
+            await this.socket.connect(this.session, true);
+            console.log("Socket connected successfully");
+        } catch (err) {
+            console.error("Socket connection failed:", err);
+            this.socket = null;
+        }
     }
 
     async findMatch(): Promise<void> {
@@ -52,20 +60,21 @@ class Nakama {
             console.log("Session or socket not found");
             return;
         }
-        const matches = await this.client.rpc(this.session, rpc_name, {});
-        if (typeof matches === "object" && matches !== null) {
-            const safeParsedJson = matches as { payload: { matchIds: string[] } };
-            this.matchId = safeParsedJson.payload.matchIds[0];
-            await this.socket.joinMatch(this.matchId);
-            console.log("Match joined!");
+        try {
+            const matches = await this.client.rpc(this.session, rpc_name, {});
+            if (typeof matches === "object" && matches !== null) {
+                const safeParsedJson = matches as { payload: { matchIds: string[] } };
+                this.matchId = safeParsedJson.payload.matchIds[0];
+                await this.socket.joinMatch(this.matchId);
+                console.log("Match joined:", this.matchId);
+            }
+        } catch (err) {
+            console.error("findMatch error:", err);
         }
     }
 
     async makeMove(index: number): Promise<void> {
-        if (!this.socket || !this.matchId) {
-            console.log("Socket or matchId not found");
-            return;
-        }
+        if (!this.socket || !this.matchId) return;
         const data = { position: index };
         await this.socket.sendMatchState(this.matchId, OpCode.MOVE, JSON.stringify(data));
     }
@@ -84,7 +93,6 @@ class Nakama {
         if (!this.session) return [];
         try {
             const result = await this.client.rpc(this.session, "get_leaderboard_js", {});
-            // SDK already parses payload — do NOT JSON.parse it again
             const payload = result.payload;
             if (Array.isArray(payload)) return payload;
             if (typeof payload === "string") return JSON.parse(payload);
