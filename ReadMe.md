@@ -37,6 +37,9 @@
 
 ## 1. Project Overview
 
+[Watch the video here](https://youtu.be/nIN2S7-JdC8)
+
+
 This project is a production-ready, real-time multiplayer Tic-Tac-Toe game built on top of **Nakama** — an open-source, distributed game server by Heroic Labs. The core design principle is **server-authoritative game logic**: the server owns and validates every state transition. Clients are purely presentational — they send intent (a move), and the server decides whether to accept or reject it.
 
 This ensures:
